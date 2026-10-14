@@ -139,7 +139,7 @@ export const TaskDetail = ({ task, onClose }) => {
             <select
               value={listId}
               onChange={(e) => setListId(e.target.value)}
-              className="px-2.5 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-semibold text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-brand-yellow cursor-pointer"
+              className="pl-3 pr-8 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-semibold text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-brand-yellow cursor-pointer"
             >
               {lists.map((l) => (
                 <option key={l.id} value={l.id}>
@@ -172,7 +172,7 @@ export const TaskDetail = ({ task, onClose }) => {
             <select
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
-              className="px-2.5 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-semibold text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-brand-yellow cursor-pointer"
+              className="pl-3 pr-8 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-semibold text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-brand-yellow cursor-pointer"
             >
               <option value="high">High Priority</option>
               <option value="medium">Medium Priority</option>
@@ -189,7 +189,7 @@ export const TaskDetail = ({ task, onClose }) => {
             <select
               value={recurrence}
               onChange={(e) => setRecurrence(e.target.value)}
-              className="px-2.5 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-semibold text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-brand-yellow cursor-pointer"
+              className="pl-3 pr-8 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-semibold text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-brand-yellow cursor-pointer"
             >
               <option value="">None</option>
               <option value="daily">Daily</option>

@@ -124,7 +124,7 @@ export const TaskList = () => {
                 <select
                   value={sortOption}
                   onChange={(e) => setSortOption(e.target.value)}
-                  className="bg-transparent text-stone-900 dark:text-stone-100 font-semibold focus:outline-none cursor-pointer"
+                  className="bg-transparent text-stone-900 dark:text-stone-100 font-semibold focus:outline-none cursor-pointer pr-5"
                 >
                   <option value="manual">Manual (Drag)</option>
                   <option value="due_date">Due date</option>
@@ -141,7 +141,7 @@ export const TaskList = () => {
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value)}
-                className="bg-transparent text-stone-900 dark:text-stone-100 font-semibold focus:outline-none cursor-pointer"
+                className="bg-transparent text-stone-900 dark:text-stone-100 font-semibold focus:outline-none cursor-pointer pr-5"
               >
                 <option value="all">All Priorities</option>
                 <option value="high">High</option>
@@ -156,7 +156,7 @@ export const TaskList = () => {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-transparent text-stone-900 dark:text-stone-100 font-semibold focus:outline-none cursor-pointer"
+                className="bg-transparent text-stone-900 dark:text-stone-100 font-semibold focus:outline-none cursor-pointer pr-5"
               >
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
@@ -209,7 +209,7 @@ export const TaskList = () => {
           <select
             value={quickPriority}
             onChange={(e) => setQuickPriority(e.target.value)}
-            className="hidden sm:block text-xs rounded-lg px-2 py-1 border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 focus:outline-none"
+            className="hidden sm:block text-xs rounded-lg pl-2 pr-6 py-1 border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 focus:outline-none cursor-pointer"
           >
             <option value="high">High</option>
             <option value="medium">Medium</option>
