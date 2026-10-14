@@ -331,15 +331,6 @@ export const Sidebar = ({ isCollapsed, setIsCollapsed, onOpenSettings }) => {
             {!isCollapsed && <span>Settings</span>}
           </button>
 
-          <button
-            type="button"
-            onClick={() => signOut()}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-stone-700 dark:text-stone-300 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-            title="Sign out"
-          >
-            <LogOut className="w-4 h-4 text-stone-500 hover:text-red-600" />
-            {!isCollapsed && <span>Sign out</span>}
-          </button>
         </div>
       </aside>
 

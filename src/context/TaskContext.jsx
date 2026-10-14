@@ -1,6 +1,4 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { useAuth } from './AuthContext';
 import confetti from 'canvas-confetti';
 
 const TaskContext = createContext(null);
@@ -69,7 +67,7 @@ const DEFAULT_TASKS = [
     title: "Renew driver's license",
     description: 'Appointment scheduled online. Bring passport, proof of address, and fee receipt.',
     list_id: 'list-1',
-    due_date: getTodayDateString(0), // Today
+    due_date: getTodayDateString(0),
     priority: 'high',
     recurrence: null,
     is_completed: false,
@@ -125,23 +123,46 @@ const DEFAULT_TASKS = [
   },
 ];
 
-export const TaskProvider = ({ children }) => {
-  const { user, isConfigured } = useAuth();
+const loadFromStorage = (key, fallback) => {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : fallback;
+  } catch (err) {
+    console.warn(`Failed to read ${key} from localStorage:`, err);
+    return fallback;
+  }
+};
 
-  const [tasks, setTasks] = useState([]);
-  const [lists, setLists] = useState([]);
-  const [tags, setTags] = useState([]);
-  const [loading, setLoading] = useState(true);
+const saveToStorage = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    console.warn(`Failed to save ${key} to localStorage:`, err);
+  }
+};
+
+export const TaskProvider = ({ children }) => {
+  const [lists, setLists] = useState(() => loadFromStorage('productivity_local_lists', DEFAULT_LISTS));
+  const [tags, setTags] = useState(() => loadFromStorage('productivity_local_tags', DEFAULT_TAGS));
+  const [tasks, setTasks] = useState(() => {
+    const stored = loadFromStorage('productivity_local_tasks', DEFAULT_TASKS);
+    // Enrich with list references
+    return stored.map((t) => ({
+      ...t,
+      list: DEFAULT_LISTS.find((l) => l.id === t.list_id) || t.list,
+    }));
+  });
+  const [loading] = useState(false);
 
   // UI Navigation & Filters
-  const [selectedView, setSelectedView] = useState('today'); // 'upcoming', 'today', 'calendar', 'sticky', 'completed'
+  const [selectedView, setSelectedView] = useState('today');
   const [activeListId, setActiveListId] = useState(null);
   const [activeTagId, setActiveTagId] = useState(null);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortOption, setSortOption] = useState('manual'); // 'manual', 'due_date', 'priority', 'name', 'created_at'
-  const [filterPriority, setFilterPriority] = useState('all'); // 'all', 'high', 'medium', 'low'
-  const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'active', 'completed', 'overdue'
+  const [sortOption, setSortOption] = useState('manual');
+  const [filterPriority, setFilterPriority] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
 
   // Toasts
   const [toasts, setToasts] = useState([]);
@@ -151,367 +172,60 @@ export const TaskProvider = ({ children }) => {
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3500);
+    }, 3000);
   }, []);
 
   const removeToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Seed sample data in Supabase if empty
-  const seedSupabaseData = async () => {
-    if (!supabase || !user) return;
-    try {
-      // Check if user has lists
-      const { data: existingLists } = await supabase.from('lists').select('id').limit(1);
-      if (existingLists && existingLists.length > 0) return;
-
-      // Seed Lists
-      const { data: createdLists, error: listError } = await supabase
-        .from('lists')
-        .insert([
-          { name: 'Personal', color: '#FF7675' },
-          { name: 'Work', color: '#74B9FF' },
-        ])
-        .select();
-
-      if (listError || !createdLists) return;
-
-      const personalList = createdLists.find((l) => l.name === 'Personal') || createdLists[0];
-      const workList = createdLists.find((l) => l.name === 'Work') || createdLists[1];
-
-      // Seed Tags
-      const { data: createdTags } = await supabase
-        .from('tags')
-        .insert([
-          { name: 'Urgent', color: '#FEE2E2' },
-          { name: 'Home', color: '#E0E7FF' },
-          { name: 'Project', color: '#FEF3C7' },
-        ])
-        .select();
-
-      // Seed Tasks
-      const { data: createdTasks } = await supabase
-        .from('tasks')
-        .insert([
-          {
-            title: 'Research content ideas',
-            description: 'Explore trending industry topics, user feedback, and competitive analysis for Q4.',
-            list_id: workList.id,
-            due_date: getTodayDateString(2),
-            priority: 'medium',
-            position: 1000,
-            sticky_color: '#FEF08A',
-            sticky_x: 40,
-            sticky_y: 40,
-          },
-          {
-            title: 'Create a database of guest authors',
-            description: 'Compile emails, publication links, and outreach statuses in our Notion directory.',
-            list_id: workList.id,
-            due_date: getTodayDateString(4),
-            priority: 'high',
-            position: 2000,
-            sticky_color: '#BAE6FD',
-            sticky_x: 290,
-            sticky_y: 40,
-          },
-          {
-            title: "Renew driver's license",
-            description: 'Appointment scheduled online. Bring passport, proof of address, and fee receipt.',
-            list_id: personalList.id,
-            due_date: getTodayDateString(0),
-            priority: 'high',
-            position: 3000,
-            sticky_color: '#BBF7D0',
-            sticky_x: 540,
-            sticky_y: 40,
-          },
-          {
-            title: 'Consult accountant',
-            description: 'Review quarterly deductions and prepare tax write-offs for office equipment.',
-            list_id: workList.id,
-            due_date: getTodayDateString(1),
-            priority: 'low',
-            recurrence: 'monthly',
-            position: 4000,
-            sticky_color: '#FED7AA',
-            sticky_x: 40,
-            sticky_y: 280,
-          },
-          {
-            title: 'Print business card',
-            description: 'Send high-res PDF to local print shop on 350gsm matte paper with spot UV.',
-            list_id: personalList.id,
-            due_date: getTodayDateString(5),
-            priority: 'medium',
-            position: 5000,
-            sticky_color: '#FBCFE8',
-            sticky_x: 290,
-            sticky_y: 280,
-          },
-        ])
-        .select();
-
-      // Seed subtask for Renew driver's license
-      const renewTask = createdTasks?.find((t) => t.title.includes("Renew driver's license"));
-      if (renewTask) {
-        await supabase.from('subtasks').insert([
-          {
-            task_id: renewTask.id,
-            title: 'Book DMV appointment',
-            is_completed: true,
-            position: 1,
-          },
-        ]);
-      }
-
-      // Link tags if tags created
-      if (createdTags && createdTasks) {
-        const guestTask = createdTasks.find((t) => t.title.includes('guest authors'));
-        const urgentTag = createdTags.find((tg) => tg.name === 'Urgent');
-        if (guestTask && urgentTag) {
-          await supabase.from('task_tags').insert([
-            { task_id: guestTask.id, tag_id: urgentTag.id },
-          ]);
-        }
-      }
-    } catch (e) {
-      console.warn('Seeding warning:', e);
-    }
-  };
-
-  // Fetch initial data
-  const fetchData = useCallback(async () => {
-    if (!user) {
-      setTasks([]);
-      setLists([]);
-      setTags([]);
-      setLoading(false);
-      return;
-    }
-
-    if (!isConfigured) {
-      // Demo / Local storage mode
-      try {
-        const savedTasks = localStorage.getItem('productivity_demo_tasks');
-        const savedLists = localStorage.getItem('productivity_demo_lists');
-        const savedTags = localStorage.getItem('productivity_demo_tags');
-
-        setTasks(savedTasks ? JSON.parse(savedTasks) : DEFAULT_TASKS);
-        setLists(savedLists ? JSON.parse(savedLists) : DEFAULT_LISTS);
-        setTags(savedTags ? JSON.parse(savedTags) : DEFAULT_TAGS);
-      } catch (e) {
-        console.error('Error loading demo state:', e);
-        setTasks(DEFAULT_TASKS);
-        setLists(DEFAULT_LISTS);
-        setTags(DEFAULT_TAGS);
-      }
-      setLoading(false);
-      return;
-    }
-
-    // Supabase connected
-    try {
-      setLoading(true);
-
-      // Attempt seed first if fresh
-      await seedSupabaseData();
-
-      // 1. Fetch lists
-      const { data: listsData, error: listsError } = await supabase
-        .from('lists')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      if (listsError) throw listsError;
-      setLists(listsData || []);
-
-      // 2. Fetch tags
-      const { data: tagsData, error: tagsError } = await supabase
-        .from('tags')
-        .select('*')
-        .order('name', { ascending: true });
-
-      if (tagsError) throw tagsError;
-      setTags(tagsData || []);
-
-      // 3. Fetch tasks with relations in one query
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('tasks')
-        .select(`
-          *,
-          list:lists(*),
-          subtasks(*),
-          task_tags(tag:tags(*))
-        `)
-        .order('position', { ascending: true });
-
-      if (tasksError) throw tasksError;
-
-      // Ensure subtasks are sorted
-      const normalizedTasks = (tasksData || []).map((t) => ({
-        ...t,
-        subtasks: (t.subtasks || []).sort((a, b) => a.position - b.position),
-      }));
-
-      setTasks(normalizedTasks);
-    } catch (err) {
-      console.error('Error fetching data from Supabase:', err);
-      addToast('Failed to load data from Supabase. Falling back to local data.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [user, isConfigured, addToast]);
+  // Sync to localStorage
+  useEffect(() => {
+    saveToStorage('productivity_local_lists', lists);
+  }, [lists]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    saveToStorage('productivity_local_tags', tags);
+  }, [tags]);
 
-  // Persist demo mode updates to localStorage
   useEffect(() => {
-    if (!isConfigured && !loading && user) {
-      try {
-        localStorage.setItem('productivity_demo_tasks', JSON.stringify(tasks));
-        localStorage.setItem('productivity_demo_lists', JSON.stringify(lists));
-        localStorage.setItem('productivity_demo_tags', JSON.stringify(tags));
-      } catch (err) {
-        console.warn('Storage sync error:', err);
-      }
-    }
-  }, [tasks, lists, tags, isConfigured, loading, user]);
-
-  // Realtime Subscriptions
-  useEffect(() => {
-    if (!isConfigured || !supabase || !user) return;
-
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'tasks' },
-        () => {
-          fetchData();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'subtasks' },
-        () => {
-          fetchData();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'lists' },
-        () => {
-          fetchData();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'tags' },
-        () => {
-          fetchData();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'task_tags' },
-        () => {
-          fetchData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isConfigured, user, fetchData]);
-
-  // OPTIMISTIC TASK ACTIONS
+    saveToStorage('productivity_local_tasks', tasks);
+  }, [tasks]);
 
   // 1. Add Task
-  const addTask = async (taskPayload) => {
-    const tempId = 'temp-' + Date.now();
+  const addTask = (taskPayload) => {
+    const newId = 'task-' + Date.now();
     const position = tasks.length > 0 ? Math.max(...tasks.map((t) => t.position || 0)) + 1000 : 1000;
+    const selectedList = lists.find((l) => l.id === (taskPayload.list_id || activeListId)) || lists[0] || null;
 
-    const selectedList = lists.find((l) => l.id === (taskPayload.list_id || activeListId));
-    const optimisticTask = {
-      id: tempId,
+    const newTask = {
+      id: newId,
       title: taskPayload.title || 'New Task',
       description: taskPayload.description || '',
-      list_id: selectedList ? selectedList.id : (lists[0]?.id || null),
-      list: selectedList || lists[0] || null,
+      list_id: selectedList?.id || null,
+      list: selectedList,
       due_date: taskPayload.due_date || (selectedView === 'today' ? getTodayDateString(0) : null),
       priority: taskPayload.priority || 'medium',
       recurrence: taskPayload.recurrence || null,
       is_completed: false,
       completed_at: null,
       position,
-      sticky_color: '#FEF08A',
-      sticky_x: 40 + (tasks.length % 4) * 20,
-      sticky_y: 40 + (tasks.length % 4) * 20,
+      sticky_color: taskPayload.sticky_color || '#FEF08A',
+      sticky_x: taskPayload.sticky_x ?? (40 + (tasks.length % 5) * 30),
+      sticky_y: taskPayload.sticky_y ?? (40 + (tasks.length % 5) * 30),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       subtasks: [],
       task_tags: [],
     };
 
-    // Optimistic UI update
-    setTasks((prev) => [optimisticTask, ...prev]);
-
-    if (!isConfigured) {
-      addToast('Task added locally', 'success');
-      return optimisticTask;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .insert({
-          title: optimisticTask.title,
-          description: optimisticTask.description,
-          list_id: optimisticTask.list_id,
-          due_date: optimisticTask.due_date,
-          priority: optimisticTask.priority,
-          recurrence: optimisticTask.recurrence,
-          is_completed: false,
-          position: optimisticTask.position,
-          sticky_color: optimisticTask.sticky_color,
-          sticky_x: optimisticTask.sticky_x,
-          sticky_y: optimisticTask.sticky_y,
-        })
-        .select(`
-          *,
-          list:lists(*),
-          subtasks(*),
-          task_tags(tag:tags(*))
-        `)
-        .single();
-
-      if (error) throw error;
-
-      // Replace temp task with confirmed DB record
-      setTasks((prev) => prev.map((t) => (t.id === tempId ? { ...data, subtasks: [] } : t)));
-      if (selectedTaskId === tempId) {
-        setSelectedTaskId(data.id);
-      }
-      return data;
-    } catch (err) {
-      console.error('Error adding task:', err);
-      // Rollback
-      setTasks((prev) => prev.filter((t) => t.id !== tempId));
-      addToast('Failed to add task: ' + (err.message || 'Server error'), 'error');
-      return null;
-    }
+    setTasks((prev) => [newTask, ...prev]);
+    addToast('Task added', 'success');
+    return newTask;
   };
 
   // 2. Update Task
-  const updateTask = async (taskId, updates) => {
-    const previousTasks = [...tasks];
-
-    // Optimistic update
+  const updateTask = (taskId, updates) => {
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id === taskId) {
@@ -524,30 +238,10 @@ export const TaskProvider = ({ children }) => {
         return t;
       })
     );
-
-    if (!isConfigured) {
-      return;
-    }
-
-    try {
-      // Exclude relational joined fields before DB update
-      const dbUpdates = { ...updates };
-      delete dbUpdates.list;
-      delete dbUpdates.subtasks;
-      delete dbUpdates.task_tags;
-
-      const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', taskId);
-      if (error) throw error;
-    } catch (err) {
-      console.error('Error updating task:', err);
-      // Rollback
-      setTasks(previousTasks);
-      addToast('Failed to save task changes', 'error');
-    }
   };
 
-  // 3. Toggle Complete Task (With Recurrence & Confetti)
-  const toggleTaskCompletion = async (taskId) => {
+  // 3. Toggle Task Completion (with Recurrence & Confetti)
+  const toggleTaskCompletion = (taskId) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
@@ -563,12 +257,11 @@ export const TaskProvider = ({ children }) => {
           colors: ['#FFD43B', '#729584', '#74B9FF', '#FF7675'],
         });
       } catch {
-        // Safe fallback
+        // Fallback
       }
     }
 
-    // Handle Recurring Task creation if completed and recurrence exists
-    let recurrenceInsert = null;
+    let recurringTask = null;
     if (nextCompleted && task.recurrence) {
       const nextDue = new Date(task.due_date ? task.due_date : new Date());
       if (task.recurrence === 'daily') {
@@ -579,106 +272,40 @@ export const TaskProvider = ({ children }) => {
         nextDue.setMonth(nextDue.getMonth() + 1);
       }
 
-      recurrenceInsert = {
-        title: task.title,
-        description: task.description,
-        list_id: task.list_id,
+      recurringTask = {
+        ...task,
+        id: 'task-' + Date.now(),
         due_date: nextDue.toISOString().split('T')[0],
-        priority: task.priority,
-        recurrence: task.recurrence,
         is_completed: false,
+        completed_at: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         position: task.position + 100,
-        sticky_color: task.sticky_color,
-        sticky_x: task.sticky_x,
-        sticky_y: task.sticky_y,
       };
     }
 
-    const previousTasks = [...tasks];
-
-    // Optimistic Update
     setTasks((prev) => {
       const updated = prev.map((t) =>
         t.id === taskId ? { ...t, is_completed: nextCompleted, completed_at: completedAt } : t
       );
-      if (recurrenceInsert) {
-        const optimisticRecurring = {
-          ...recurrenceInsert,
-          id: 'temp-recurring-' + Date.now(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          subtasks: [],
-          task_tags: task.task_tags || [],
-          list: task.list,
-        };
-        return [optimisticRecurring, ...updated];
+      if (recurringTask) {
+        return [recurringTask, ...updated];
       }
       return updated;
     });
-
-    if (!isConfigured) return;
-
-    try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ is_completed: nextCompleted, completed_at: completedAt })
-        .eq('id', taskId);
-
-      if (error) throw error;
-
-      if (recurrenceInsert) {
-        const { data: recData, error: recError } = await supabase
-          .from('tasks')
-          .insert(recurrenceInsert)
-          .select(`
-            *,
-            list:lists(*),
-            subtasks(*),
-            task_tags(tag:tags(*))
-          `)
-          .single();
-
-        if (recError) throw recError;
-        if (recData) {
-          setTasks((prev) =>
-            prev.map((t) => (t.id.startsWith('temp-recurring-') ? recData : t))
-          );
-        }
-      }
-    } catch (err) {
-      console.error('Error toggling completion:', err);
-      setTasks(previousTasks);
-      addToast('Failed to update task status', 'error');
-    }
   };
 
   // 4. Delete Task
-  const deleteTask = async (taskId) => {
-    const previousTasks = [...tasks];
+  const deleteTask = (taskId) => {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
     if (selectedTaskId === taskId) {
       setSelectedTaskId(null);
     }
-
-    if (!isConfigured) {
-      addToast('Task deleted', 'info');
-      return;
-    }
-
-    try {
-      const { error } = await supabase.from('tasks').delete().eq('id', taskId);
-      if (error) throw error;
-      addToast('Task deleted', 'info');
-    } catch (err) {
-      console.error('Error deleting task:', err);
-      setTasks(previousTasks);
-      addToast('Failed to delete task', 'error');
-    }
+    addToast('Task deleted', 'info');
   };
 
-  // 5. Reorder Tasks (Float Midpoint Algorithm)
-  const reorderTasks = async (movedTaskId, targetIndex) => {
-    // Current filtered/active task order
+  // 5. Reorder Tasks (Float Midpoint)
+  const reorderTasks = (movedTaskId, targetIndex) => {
     const listCopy = [...tasks];
     const currentIndex = listCopy.findIndex((t) => t.id === movedTaskId);
     if (currentIndex === -1) return;
@@ -686,7 +313,6 @@ export const TaskProvider = ({ children }) => {
     const [movedItem] = listCopy.splice(currentIndex, 1);
     listCopy.splice(targetIndex, 0, movedItem);
 
-    // Calculate midpoint position
     let newPosition;
     if (targetIndex === 0) {
       const nextPos = listCopy[1]?.position ?? 1000;
@@ -700,118 +326,44 @@ export const TaskProvider = ({ children }) => {
       newPosition = prevPos + (nextPos - prevPos) / 2;
     }
 
-    // Apply to item
     movedItem.position = newPosition;
-
-    // Optimistic UI state
     setTasks([...listCopy]);
-
-    if (!isConfigured) return;
-
-    try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ position: newPosition })
-        .eq('id', movedTaskId);
-
-      if (error) throw error;
-    } catch (err) {
-      console.error('Error saving reorder:', err);
-      fetchData(); // Reset to server state
-      addToast('Failed to update task order', 'error');
-    }
   };
 
-  // 6. Subtasks CRUD
-  const addSubtask = async (taskId, title) => {
+  // 6. Subtasks
+  const addSubtask = (taskId, title) => {
     if (!title.trim()) return;
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
-    const tempSubId = 'sub-' + Date.now();
-    const position = (task.subtasks?.length || 0) + 1;
     const newSubtask = {
-      id: tempSubId,
+      id: 'sub-' + Date.now(),
       task_id: taskId,
       title: title.trim(),
       is_completed: false,
-      position,
+      position: (task.subtasks?.length || 0) + 1,
     };
 
-    const previousTasks = [...tasks];
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, subtasks: [...(t.subtasks || []), newSubtask] } : t))
     );
-
-    if (!isConfigured) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('subtasks')
-        .insert({
-          task_id: taskId,
-          title: newSubtask.title,
-          is_completed: false,
-          position: newSubtask.position,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId
-            ? {
-                ...t,
-                subtasks: (t.subtasks || []).map((s) => (s.id === tempSubId ? data : s)),
-              }
-            : t
-        )
-      );
-    } catch (err) {
-      console.error('Error adding subtask:', err);
-      setTasks(previousTasks);
-      addToast('Failed to add subtask', 'error');
-    }
   };
 
-  const toggleSubtask = async (taskId, subtaskId) => {
-    const previousTasks = [...tasks];
-    let nextState = false;
-
+  const toggleSubtask = (taskId, subtaskId) => {
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id === taskId) {
-          const updatedSubs = (t.subtasks || []).map((s) => {
-            if (s.id === subtaskId) {
-              nextState = !s.is_completed;
-              return { ...s, is_completed: nextState };
-            }
-            return s;
-          });
+          const updatedSubs = (t.subtasks || []).map((s) =>
+            s.id === subtaskId ? { ...s, is_completed: !s.is_completed } : s
+          );
           return { ...t, subtasks: updatedSubs };
         }
         return t;
       })
     );
-
-    if (!isConfigured) return;
-
-    try {
-      const { error } = await supabase
-        .from('subtasks')
-        .update({ is_completed: nextState })
-        .eq('id', subtaskId);
-      if (error) throw error;
-    } catch (err) {
-      console.error('Error toggling subtask:', err);
-      setTasks(previousTasks);
-      addToast('Failed to update subtask', 'error');
-    }
   };
 
-  const deleteSubtask = async (taskId, subtaskId) => {
-    const previousTasks = [...tasks];
+  const deleteSubtask = (taskId, subtaskId) => {
     setTasks((prev) =>
       prev.map((t) =>
         t.id === taskId
@@ -819,61 +371,23 @@ export const TaskProvider = ({ children }) => {
           : t
       )
     );
-
-    if (!isConfigured) return;
-
-    try {
-      const { error } = await supabase.from('subtasks').delete().eq('id', subtaskId);
-      if (error) throw error;
-    } catch (err) {
-      console.error('Error deleting subtask:', err);
-      setTasks(previousTasks);
-      addToast('Failed to delete subtask', 'error');
-    }
   };
 
-  // 7. Lists Management
-  const addList = async (name, color = '#74B9FF') => {
+  // 7. Lists
+  const addList = (name, color = '#74B9FF') => {
     if (!name.trim()) return;
-    const tempListId = 'list-' + Date.now();
     const newList = {
-      id: tempListId,
+      id: 'list-' + Date.now(),
       name: name.trim(),
       color,
       created_at: new Date().toISOString(),
     };
-
     setLists((prev) => [...prev, newList]);
-
-    if (!isConfigured) {
-      addToast('List created', 'success');
-      return newList;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('lists')
-        .insert({ name: newList.name, color: newList.color })
-        .select()
-        .single();
-
-      if (error) throw error;
-      setLists((prev) => prev.map((l) => (l.id === tempListId ? data : l)));
-      addToast('List created', 'success');
-      return data;
-    } catch (err) {
-      console.error('Error creating list:', err);
-      setLists((prev) => prev.filter((l) => l.id !== tempListId));
-      addToast('Failed to create list: ' + err.message, 'error');
-      return null;
-    }
+    addToast('List created', 'success');
+    return newList;
   };
 
-  const updateList = async (listId, updates) => {
-    const previousLists = [...lists];
-    const previousTasks = [...tasks];
-
-    // Optimistic update for lists and task list relations
+  const updateList = (listId, updates) => {
     setLists((prev) =>
       prev.map((l) => (l.id === listId ? { ...l, ...updates } : l))
     );
@@ -882,96 +396,36 @@ export const TaskProvider = ({ children }) => {
         t.list_id === listId ? { ...t, list: { ...(t.list || {}), ...updates } } : t
       )
     );
-
-    if (!isConfigured) {
-      addToast('List updated', 'success');
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('lists')
-        .update({ name: updates.name, color: updates.color })
-        .eq('id', listId);
-      if (error) throw error;
-      addToast('List updated', 'success');
-    } catch (err) {
-      console.error('Error updating list:', err);
-      setLists(previousLists);
-      setTasks(previousTasks);
-      addToast('Failed to update list: ' + err.message, 'error');
-    }
+    addToast('List updated', 'success');
   };
 
-  const deleteList = async (listId) => {
-    const previousLists = [...lists];
+  const deleteList = (listId) => {
     setLists((prev) => prev.filter((l) => l.id !== listId));
     if (activeListId === listId) {
       setActiveListId(null);
       setSelectedView('today');
     }
-
-    if (!isConfigured) {
-      addToast('List deleted', 'info');
-      return;
-    }
-
-    try {
-      const { error } = await supabase.from('lists').delete().eq('id', listId);
-      if (error) throw error;
-      addToast('List deleted', 'info');
-    } catch (err) {
-      console.error('Error deleting list:', err);
-      setLists(previousLists);
-      addToast('Failed to delete list', 'error');
-    }
+    addToast('List deleted', 'info');
   };
 
-  // 8. Tags Management & Task-Tag linking
-  const addTag = async (name, color = '#FEE2E2') => {
+  // 8. Tags
+  const addTag = (name, color = '#FEE2E2') => {
     if (!name.trim()) return;
-    const tempTagId = 'tag-' + Date.now();
     const newTag = {
-      id: tempTagId,
+      id: 'tag-' + Date.now(),
       name: name.trim(),
       color,
       created_at: new Date().toISOString(),
     };
-
     setTags((prev) => [...prev, newTag]);
-
-    if (!isConfigured) {
-      addToast('Tag created', 'success');
-      return newTag;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('tags')
-        .insert({ name: newTag.name, color: newTag.color })
-        .select()
-        .single();
-
-      if (error) throw error;
-      setTags((prev) => prev.map((tg) => (tg.id === tempTagId ? data : tg)));
-      addToast('Tag created', 'success');
-      return data;
-    } catch (err) {
-      console.error('Error creating tag:', err);
-      setTags((prev) => prev.filter((tg) => tg.id !== tempTagId));
-      addToast('Failed to create tag: ' + (err.message || 'Already exists'), 'error');
-      return null;
-    }
+    addToast('Tag created', 'success');
+    return newTag;
   };
 
-  const updateTag = async (tagId, updates) => {
-    const previousTags = [...tags];
-    const previousTasks = [...tasks];
-
+  const updateTag = (tagId, updates) => {
     setTags((prev) =>
       prev.map((tg) => (tg.id === tagId ? { ...tg, ...updates } : tg))
     );
-    // Update tags embedded in tasks
     setTasks((prev) =>
       prev.map((t) => {
         if (!t.task_tags) return t;
@@ -984,37 +438,14 @@ export const TaskProvider = ({ children }) => {
         return { ...t, task_tags: updatedTT };
       })
     );
-
-    if (!isConfigured) {
-      addToast('Tag updated', 'success');
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('tags')
-        .update({ name: updates.name, color: updates.color })
-        .eq('id', tagId);
-      if (error) throw error;
-      addToast('Tag updated', 'success');
-    } catch (err) {
-      console.error('Error updating tag:', err);
-      setTags(previousTags);
-      setTasks(previousTasks);
-      addToast('Failed to update tag: ' + (err.message || 'Error'), 'error');
-    }
+    addToast('Tag updated', 'success');
   };
 
-  const deleteTag = async (tagId) => {
-    const previousTags = [...tags];
-    const previousTasks = [...tasks];
-
+  const deleteTag = (tagId) => {
     setTags((prev) => prev.filter((tg) => tg.id !== tagId));
     if (activeTagId === tagId) {
       setActiveTagId(null);
     }
-
-    // Remove from tasks
     setTasks((prev) =>
       prev.map((t) => ({
         ...t,
@@ -1023,36 +454,18 @@ export const TaskProvider = ({ children }) => {
         ),
       }))
     );
-
-    if (!isConfigured) {
-      addToast('Tag deleted', 'info');
-      return;
-    }
-
-    try {
-      const { error } = await supabase.from('tags').delete().eq('id', tagId);
-      if (error) throw error;
-      addToast('Tag deleted', 'info');
-    } catch (err) {
-      console.error('Error deleting tag:', err);
-      setTags(previousTags);
-      setTasks(previousTasks);
-      addToast('Failed to delete tag', 'error');
-    }
+    addToast('Tag deleted', 'info');
   };
 
-  const toggleTaskTag = async (taskId, tagId) => {
-    const task = tasks.find((t) => t.id === taskId);
+  const toggleTaskTag = (taskId, tagId) => {
     const tag = tags.find((tg) => tg.id === tagId);
-    if (!task || !tag) return;
-
-    const hasTag = task.task_tags?.some((tt) => tt.tag?.id === tagId || tt.tag_id === tagId);
-    const previousTasks = [...tasks];
+    if (!tag) return;
 
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id === taskId) {
           const currentTags = t.task_tags || [];
+          const hasTag = currentTags.some((tt) => (tt.tag?.id || tt.tag_id) === tagId);
           const updatedTags = hasTag
             ? currentTags.filter((tt) => (tt.tag?.id || tt.tag_id) !== tagId)
             : [...currentTags, { task_id: taskId, tag_id: tagId, tag }];
@@ -1061,51 +474,32 @@ export const TaskProvider = ({ children }) => {
         return t;
       })
     );
-
-    if (!isConfigured) return;
-
-    try {
-      if (hasTag) {
-        const { error } = await supabase
-          .from('task_tags')
-          .delete()
-          .match({ task_id: taskId, tag_id: tagId });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('task_tags')
-          .insert({ task_id: taskId, tag_id: tagId });
-        if (error) throw error;
-      }
-    } catch (err) {
-      console.error('Error toggling tag:', err);
-      setTasks(previousTasks);
-      addToast('Failed to update tag', 'error');
-    }
   };
 
-  // Sticky Note Position / Color update
-  const updateStickyNote = async (taskId, updates) => {
+  // Sticky Notes
+  const updateStickyNote = (taskId, updates) => {
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
     );
-
-    if (!isConfigured) return;
-
-    try {
-      await supabase.from('tasks').update(updates).eq('id', taskId);
-    } catch (err) {
-      console.error('Error saving sticky note:', err);
-    }
   };
 
-  // Filtered & Sorted Tasks calculation
+  // Reset to Default Sample Data
+  const resetToDefaultData = () => {
+    setTasks(DEFAULT_TASKS);
+    setLists(DEFAULT_LISTS);
+    setTags(DEFAULT_TAGS);
+    localStorage.removeItem('productivity_local_tasks');
+    localStorage.removeItem('productivity_local_lists');
+    localStorage.removeItem('productivity_local_tags');
+    addToast('Reset to default sample data', 'info');
+  };
+
+  // Filtered Tasks
   const filteredTasks = useMemo(() => {
     const todayStr = getTodayDateString(0);
     const in7DaysStr = getTodayDateString(7);
 
     return tasks.filter((task) => {
-      // 1. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesTitle = task.title.toLowerCase().includes(q);
@@ -1113,12 +507,10 @@ export const TaskProvider = ({ children }) => {
         if (!matchesTitle && !matchesDesc) return false;
       }
 
-      // 2. Active List Filter
       if (activeListId) {
         if (task.list_id !== activeListId) return false;
       }
 
-      // 3. Active Tag Filter
       if (activeTagId) {
         const hasTag = task.task_tags?.some(
           (tt) => (tt.tag?.id || tt.tag_id) === activeTagId
@@ -1126,7 +518,6 @@ export const TaskProvider = ({ children }) => {
         if (!hasTag) return false;
       }
 
-      // 4. View Filter (only if not viewing a specific list)
       if (!activeListId) {
         if (selectedView === 'today') {
           if (task.due_date !== todayStr) return false;
@@ -1139,12 +530,10 @@ export const TaskProvider = ({ children }) => {
         }
       }
 
-      // 5. Priority Filter
       if (filterPriority !== 'all') {
         if (task.priority !== filterPriority) return false;
       }
 
-      // 6. Status Filter
       if (filterStatus === 'active' && task.is_completed) return false;
       if (filterStatus === 'completed' && !task.is_completed) return false;
       if (filterStatus === 'overdue') {
@@ -1175,7 +564,6 @@ export const TaskProvider = ({ children }) => {
     if (sortOption === 'created_at') {
       return list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }
-    // Manual position sorting (default)
     return list.sort((a, b) => (a.position || 0) - (b.position || 0));
   }, [filteredTasks, sortOption]);
 
@@ -1198,7 +586,6 @@ export const TaskProvider = ({ children }) => {
       stickyCount++;
     });
 
-    // List counts
     const listCounts = {};
     lists.forEach((l) => {
       listCounts[l.id] = tasks.filter((t) => t.list_id === l.id && !t.is_completed).length;
@@ -1246,7 +633,6 @@ export const TaskProvider = ({ children }) => {
         toasts,
         addToast,
         removeToast,
-        // Actions
         addTask,
         updateTask,
         deleteTask,
@@ -1263,7 +649,7 @@ export const TaskProvider = ({ children }) => {
         deleteTag,
         toggleTaskTag,
         updateStickyNote,
-        refetch: fetchData,
+        resetToDefaultData,
       }}
     >
       {children}

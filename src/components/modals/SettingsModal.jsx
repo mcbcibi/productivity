@@ -1,13 +1,29 @@
 import React from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import { useAuth } from '../../context/AuthContext';
-import { X, Moon, Sun, CheckCircle, Database, Keyboard, User, LogOut } from 'lucide-react';
+import { useTaskContext } from '../../context/TaskContext';
+import { X, Moon, Sun, HardDrive, Keyboard, RotateCcw, Download } from 'lucide-react';
 
 export const SettingsModal = ({ isOpen, onClose }) => {
   const { theme, toggleTheme } = useTheme();
-  const { user, isConfigured, signOut } = useAuth();
+  const { tasks, lists, tags, resetToDefaultData, addToast } = useTaskContext();
 
   if (!isOpen) return null;
+
+  const handleExportData = () => {
+    try {
+      const dataStr = JSON.stringify({ tasks, lists, tags, exportedAt: new Date().toISOString() }, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `productivity-backup-${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      addToast('Data exported successfully', 'success');
+    } catch {
+      addToast('Failed to export data', 'error');
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-fade-in">
@@ -63,34 +79,56 @@ export const SettingsModal = ({ isOpen, onClose }) => {
             </div>
           </div>
 
-          {/* Backend & Sync Status */}
+          {/* Storage Mode */}
           <div>
             <span className="block text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-3">
-              Backend Status
+              Data Storage
             </span>
             <div className="p-3.5 bg-stone-50 dark:bg-stone-800/60 rounded-xl border border-stone-200/70 dark:border-stone-700 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Database className="w-5 h-5 text-emerald-500" />
+                <HardDrive className="w-5 h-5 text-emerald-500" />
                 <div>
                   <p className="text-sm font-medium text-stone-800 dark:text-stone-200">
-                    {isConfigured ? 'Supabase Connected' : 'Local / Demo Mode'}
+                    Local Storage (Offline)
                   </p>
                   <p className="text-xs text-stone-500 dark:text-stone-400">
-                    {isConfigured
-                      ? 'Realtime sync and Postgres RLS enabled'
-                      : 'Add VITE_SUPABASE_URL in .env to connect to your database'}
+                    All tasks and lists are stored securely in your browser
                   </p>
                 </div>
               </div>
-              <span
-                className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
-                  isConfigured
-                    ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                    : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
-                }`}
-              >
-                {isConfigured ? 'Live' : 'Mock'}
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                Local
               </span>
+            </div>
+          </div>
+
+          {/* Local Data Management */}
+          <div>
+            <span className="block text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-3">
+              Manage Data
+            </span>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={handleExportData}
+                className="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-semibold text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5 text-stone-500" />
+                <span>Export JSON</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm('Reset all tasks, lists, and tags to default samples?')) {
+                    resetToDefaultData();
+                  }
+                }}
+                className="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-semibold text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-stone-500" />
+                <span>Reset Defaults</span>
+              </button>
             </div>
           </div>
 
@@ -120,41 +158,6 @@ export const SettingsModal = ({ isOpen, onClose }) => {
               </div>
             </div>
           </div>
-
-          {/* Account Profile info */}
-          {user && (
-            <div>
-              <span className="block text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-3">
-                Account
-              </span>
-              <div className="flex items-center justify-between p-3.5 bg-stone-50 dark:bg-stone-800/60 rounded-xl border border-stone-200/70 dark:border-stone-700">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-brand-yellow/30 text-stone-900 dark:text-brand-yellow flex items-center justify-center font-bold text-sm">
-                    {user.email ? user.email.charAt(0).toUpperCase() : 'U'}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-stone-800 dark:text-stone-200 truncate max-w-[190px]">
-                      {user.email || 'Demo User'}
-                    </p>
-                    <p className="text-xs text-stone-500 dark:text-stone-400">
-                      {user.isDemo ? 'Demo Session' : 'Supabase Authenticated'}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    signOut();
-                    onClose();
-                  }}
-                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
-                  title="Sign out"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

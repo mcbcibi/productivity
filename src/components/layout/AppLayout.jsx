@@ -7,7 +7,6 @@ import { TaskDetail } from '../tasks/TaskDetail';
 import { CalendarView } from '../calendar/CalendarView';
 import { StickyWallView } from '../sticky/StickyWallView';
 import { SettingsModal } from '../modals/SettingsModal';
-import { AuthModal } from '../modals/AuthModal';
 import { ToastContainer } from '../common/Toast';
 
 export const AppLayout = () => {
@@ -102,9 +101,6 @@ export const AppLayout = () => {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
-
-      {/* Auth Modal when not logged in */}
-      {!user && <AuthModal />}
 
       {/* Toast Notification Stack */}
       <ToastContainer />
