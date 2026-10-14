@@ -1,0 +1,53 @@
+import { useTaskContext } from '../context/TaskContext';
+
+export const useTasks = () => {
+  const {
+    tasks,
+    filteredTasks,
+    activeTask,
+    selectedTaskId,
+    setSelectedTaskId,
+    loading,
+    addTask,
+    updateTask,
+    deleteTask,
+    toggleTaskCompletion,
+    reorderTasks,
+    addSubtask,
+    toggleSubtask,
+    deleteSubtask,
+    updateStickyNote,
+    taskCounts,
+    sortOption,
+    setSortOption,
+    filterPriority,
+    setFilterPriority,
+    filterStatus,
+    setFilterStatus,
+  } = useTaskContext();
+
+  return {
+    tasks,
+    filteredTasks,
+    activeTask,
+    selectedTaskId,
+    setSelectedTaskId,
+    loading,
+    addTask,
+    updateTask,
+    deleteTask,
+    toggleTaskCompletion,
+    reorderTasks,
+    addSubtask,
+    toggleSubtask,
+    deleteSubtask,
+    updateStickyNote,
+    taskCounts,
+    sortOption,
+    setSortOption,
+    filterPriority,
+    setFilterPriority,
+    filterStatus,
+    setFilterStatus,
+  };
+};
