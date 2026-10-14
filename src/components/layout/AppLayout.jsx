@@ -70,35 +70,32 @@ export const AppLayout = () => {
   }, [selectedTaskId, setSelectedTaskId, isSettingsOpen, isSidebarCollapsed]);
 
   return (
-    <div className="min-h-screen bg-[#E8EFEA] dark:bg-[#151D19] flex items-center justify-center p-2 sm:p-4 md:p-6 lg:p-8 transition-colors duration-300">
-      {/* Large Rounded Container Card */}
-      <div className="w-full max-w-[1440px] h-[94vh] max-h-[960px] bg-white dark:bg-stone-900 rounded-3xl shadow-card border border-stone-200/80 dark:border-stone-800/80 flex overflow-hidden relative">
-        {/* Left Sidebar */}
-        <Sidebar
-          isCollapsed={isSidebarCollapsed}
-          setIsCollapsed={setIsSidebarCollapsed}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-        />
+    <div className="h-screen w-screen overflow-hidden bg-white dark:bg-stone-900 flex relative transition-colors duration-300">
+      {/* Left Sidebar */}
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        setIsCollapsed={setIsSidebarCollapsed}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
 
-        {/* Center Main Pane */}
-        <main className="flex-1 h-full flex flex-col overflow-hidden relative bg-white dark:bg-stone-900">
-          {!activeListId && selectedView === 'calendar' ? (
-            <CalendarView />
-          ) : !activeListId && selectedView === 'sticky' ? (
-            <StickyWallView />
-          ) : (
-            <TaskList />
-          )}
-        </main>
-
-        {/* Right Detail Pane */}
-        {activeTask && (
-          <TaskDetail
-            task={activeTask}
-            onClose={() => setSelectedTaskId(null)}
-          />
+      {/* Center Main Pane */}
+      <main className="flex-1 h-full flex flex-col overflow-hidden relative bg-white dark:bg-stone-900">
+        {!activeListId && selectedView === 'calendar' ? (
+          <CalendarView />
+        ) : !activeListId && selectedView === 'sticky' ? (
+          <StickyWallView />
+        ) : (
+          <TaskList />
         )}
-      </div>
+      </main>
+
+      {/* Right Detail Pane */}
+      {activeTask && (
+        <TaskDetail
+          task={activeTask}
+          onClose={() => setSelectedTaskId(null)}
+        />
+      )}
 
       {/* Global Modals & Toasts */}
       <SettingsModal

@@ -101,7 +101,7 @@ export const TaskList = () => {
 
   return (
     <div className="flex-1 h-full overflow-y-auto p-5 sm:p-8 flex flex-col justify-between">
-      <div className="space-y-6 max-w-4xl">
+      <div className="space-y-6 max-w-4xl mx-auto w-full">
         {/* Title & Action Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           {/* Large bold view title with count badge */}
@@ -303,7 +303,7 @@ export const TaskList = () => {
       </div>
 
       {/* Footer subtle hint */}
-      <div className="pt-8 text-center text-xs text-stone-400 dark:text-stone-500 font-medium hidden sm:block">
+      <div className="pt-8 text-center text-xs text-stone-400 dark:text-stone-500 font-medium hidden sm:block max-w-4xl mx-auto w-full">
         Tip: Press <kbd className="px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 font-mono font-semibold">N</kbd> to add task, <kbd className="px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 font-mono font-semibold">/</kbd> to search, <kbd className="px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 font-mono font-semibold">Esc</kbd> to close details.
       </div>
     </div>
